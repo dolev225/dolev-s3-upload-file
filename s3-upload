@@ -1,0 +1,58 @@
+import streamlit as st
+import requests
+import boto3
+from io import BytesIO
+
+st.set_page_config(page_title="S3 Uploader with Auth", page_icon="🔐")
+
+# --- תפריט צד להגדרות גישה ---
+st.sidebar.header("🔑 הגדרות גישה ל-AWS")
+aws_access_key = st.sidebar.text_input("AWS Access Key:", type="password")
+aws_secret_key = st.sidebar.text_input("AWS Secret Key:", type="password")
+aws_region = st.sidebar.text_input("Region (למשל us-east-1):", value="us-east-1")
+
+st.sidebar.divider()
+bucket_name = st.sidebar.text_input("שם ה-Bucket:")
+s3_folder = st.sidebar.text_input("תיקייה ב-S3 (אופציונלי):")
+
+def get_s3_client():
+    """יצירת חיבור ל-S3 עם המפתחות שהוזנו"""
+    return boto3.client(
+        's3',
+        aws_access_key_id=aws_access_key,
+        aws_secret_access_key=aws_secret_key,
+        region_name=aws_region
+    )
+
+def upload_to_s3(file_obj, filename):
+    if not aws_access_key or not aws_secret_key:
+        st.error("חובה להזין Access Key ו-Secret Key בתפריט הצד!")
+        return
+
+    try:
+        s3_client = get_s3_client()
+        full_path = f"{s3_folder}{filename}" if s3_folder else filename
+        
+        with st.spinner(f"מעלה את {filename}..."):
+            s3_client.upload_fileobj(file_obj, bucket_name, full_path)
+        st.success(f"✅ הקובץ הועלה בהצלחה!")
+    except Exception as e:
+        st.error(f"שגיאה בהעלאה: {e}")
+
+# --- ממשק המשתמש (Tabs) ---
+st.title("☁️ מעלה קבצים ל-S3")
+tab1, tab2 = st.tabs(["🔗 קישור (URL)", "📁 גרירת קובץ"])
+
+with tab1:
+    url = st.text_input("כתובת ה-URL:")
+    custom_name = st.text_input("שם הקובץ ב-S3 (למשל image.jpg):")
+    if st.button("העלה מ-URL"):
+        if url and custom_name:
+            res = requests.get(url, stream=True)
+            upload_to_s3(BytesIO(res.content), custom_name)
+
+with tab2:
+    uploaded_file = st.file_uploader("גרור קובץ לכאן")
+    if st.button("העלה קובץ שנגרר"):
+        if uploaded_file:
+            upload_to_s3(uploaded_file, uploaded_file.name)
