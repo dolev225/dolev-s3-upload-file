@@ -1,0 +1,6 @@
+python -m streamlit run app.py --server.port 8080
+
+
+you need to install all the import and choss the port
+
+if port 80 need sudo 
